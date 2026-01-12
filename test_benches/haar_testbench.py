@@ -5,6 +5,8 @@ import time
 import cv2
 import os
 
+# Haar cascades URL: https://github.com/opencv/opencv/tree/3.4/data/haarcascades
+
 # extracting root path
 root_path = os.path.dirname(os.path.abspath(__file__))
 # construct the argument parser and parse the arguments
