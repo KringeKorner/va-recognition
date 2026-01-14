@@ -34,14 +34,19 @@ def clean_up():
     #     print("THREAD ALIVE:", CONTROLLER_THREAD.is_alive())
     print("SHUTTING DOWN CONTROLLER")
     cv.destroyAllWindows()
+    while not R2C.empty():
+        try:
+            _ = R2C.get_nowait()
+        except queue.Empty:
+            break
     print("CONTROLLER TERMINATED")
 
 # main
 # def main():
 video_recorder.initialize(R2C)
 while True:
-    if CONTROLLER_STOP.is_set():
-        break
+    # if CONTROLLER_STOP.is_set():
+    #     break
     print("RECEIVED FRAME")
     FRAME = R2C.get(timeout=0.5)
     cv.imshow("RECEIVING BAY", FRAME)

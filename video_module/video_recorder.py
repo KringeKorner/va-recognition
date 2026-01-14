@@ -15,7 +15,6 @@ RECORDING_STOP = threading.Event()
 RECORDER_THREAD = None
 STREAM = None
 
-
 # helper functions
 def initialize(QUEUE):
     global STREAM, RECORDER_THREAD
@@ -24,7 +23,6 @@ def initialize(QUEUE):
     time.sleep(2.0)
     RECORDER_THREAD = threading.Thread(target=main, args=(STREAM, QUEUE), daemon=True)
     RECORDER_THREAD.start()
-
 
 def clean_up():
     print("STOPPING RECORDING")
@@ -40,7 +38,6 @@ def clean_up():
         print("THREAD ALIVE:", RECORDER_THREAD.is_alive())
     print("RECORDER TERMINATED")
     time.sleep(1.0)
-
 
 # main
 def main(STREAM, QUEUE):
