@@ -11,6 +11,7 @@ import queue
 CAM_SRC = 0
 CAM_RES = (720, 1280)
 FRAME_RATE = 30
+ID = 0
 RECORDING_STOP = threading.Event()
 RECORDER_THREAD = None
 STREAM = None
@@ -41,6 +42,7 @@ def clean_up():
 
 # main
 def main(STREAM, QUEUE):
+    global ID
     if STREAM is None:
         print("INITIALIZATION REQUIRED")
     else:
@@ -51,8 +53,13 @@ def main(STREAM, QUEUE):
             if FRAME is None:
                 continue
             try:
+                ID += 1
                 print("SENDING FRAME")
-                QUEUE.put(FRAME, block=False)
+                FRAME_SENT = {
+                    "ID": ID,
+                    "FRAME": FRAME
+                }
+                QUEUE.put(FRAME_SENT, block=False)
             except queue.Full:
                 print("FULL, SKIPPING FRAME")
                 time.sleep(0.1)
