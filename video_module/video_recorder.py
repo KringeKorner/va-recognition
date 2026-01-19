@@ -54,12 +54,10 @@ def main(STREAM, QUEUE):
                 continue
             try:
                 ID += 1
-                print("SENDING FRAME")
                 FRAME_SENT = {
                     "ID": ID,
                     "FRAME": FRAME
                 }
                 QUEUE.put(FRAME_SENT, block=False)
             except queue.Full:
-                print("FULL, SKIPPING FRAME")
                 time.sleep(0.1)
