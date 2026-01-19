@@ -65,7 +65,6 @@ def main(RECV, SEND, POC):
         while not ANALYSIS_STOP.is_set():
             if ANALYSIS_STOP.is_set():
                 break
-            print("RECEIVING FRAME")
             try:
                 FRAME = RECV.get(timeout=0.5)
             except queue.Empty:
@@ -107,7 +106,6 @@ def main(RECV, SEND, POC):
             else:
                 print("TBD")
             try:
-                print("SENDING RESPONSE")
                 SEND.put(RESPONSE)
             except queue.Full:
-                print("FULL, WAITING")
+                continue
