@@ -1,7 +1,7 @@
 # imports
 from imutils.video import VideoStream as vs
+from queue import Queue
 import cv2 as cv
-from multiprocessing import Queue
 import os
 import threading
 import time
@@ -9,6 +9,7 @@ import queue
 
 # vars
 CAM_SRC = 0
+# CAM_RES = (480, 640)
 CAM_RES = (720, 1280)
 FRAME_RATE = 30
 ID = 0
@@ -21,8 +22,7 @@ def initialize(QUEUE):
     global STREAM, RECORDER_THREAD
     print("INITIALIZING RECORDING")
     STREAM = vs(src=CAM_SRC, resolution=CAM_RES, framerate=FRAME_RATE).start()
-    time.sleep(2.0)
-    RECORDER_THREAD = threading.Thread(target=main, args=(STREAM, QUEUE), daemon=True)
+    RECORDER_THREAD = threading.Thread(target=main, args=(STREAM, QUEUE), daemon=False)
     RECORDER_THREAD.start()
 
 def clean_up():
@@ -60,4 +60,4 @@ def main(STREAM, QUEUE):
                 }
                 QUEUE.put(FRAME_SENT, block=False)
             except queue.Full:
-                time.sleep(0.1)
+                time.sleep(0.05)

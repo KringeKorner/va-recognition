@@ -1,45 +1,48 @@
 # imports
-from multiprocessing import Queue
-import analyzer
+from queue import Queue
+from video_module import analyzer
+from video_module import debugger
+from video_module import video_recorder
 import cv2 as cv
-import debugger
 import keyboard
 import os
 import time
 import threading
-import video_recorder
 import queue
 
 # vars
+ACTIVE = True
+ANALYSIS_WINDOW = 1.0
+ANALYSIS_CYCLE = 5.0
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BUFFER = []
 CONTROLLER_STOP = threading.Event()
 CONTROLLER_THREAD = None
-C2C_MAX = video_recorder.FRAME_RATE
 DEBUG_DIR = os.path.join(BASE_DIR, "DEBUG")
-DEBUG_FILE = os.path.join(DEBUG_DIR, "DEBUGGER_OUT.txt")
+DEBUG_FILE = os.path.join(DEBUG_DIR, "CONTROLLER_LOG.txt")
 FRAMES = []
 
 # queues
 R2C = Queue(maxsize=1)
 C2A = Queue(maxsize=1)
 A2C = Queue(maxsize=1)
-C2C = Queue(maxsize=C2C_MAX)
 
 # helper functions
-# def initialize():
-#     global CONTROLLER_THREAD
-#     print("INITIALIZING CONTROLLER")
-#     CONTROLLER_THREAD = threading.Thread(target=main, args=(), daemon=False)
-#     CONTROLLER_THREAD.start()
+def initialize(C2C):
+    global CONTROLLER_THREAD
+    print("INITIALIZING CONTROLLER")
+    CONTROLLER_THREAD = threading.Thread(target=main, args=(C2C,), daemon=False)
+    CONTROLLER_THREAD.start()
 
 def clean_up():
-    # CONTROLLER_STOP.set()
-    # if CONTROLLER_THREAD is not None:
-    #     print("STOPPING THREAD")
-    #     # CONTROLLER_THREAD.join(timeout=2.0)
-    #     print("THREAD ALIVE:", CONTROLLER_THREAD.is_alive())
+    CONTROLLER_STOP.set()
+    video_recorder.clean_up()
+    analyzer.clean_up(C2A)
+    if CONTROLLER_THREAD is not None:
+        print("STOPPING THREAD")
+        CONTROLLER_THREAD.join(timeout=2.0)
+        print("THREAD ALIVE:", CONTROLLER_THREAD.is_alive())
     print("SHUTTING DOWN CONTROLLER")
-    cv.destroyAllWindows()
     while not R2C.empty():
         try:
             _ = R2C.get_nowait()
@@ -57,27 +60,48 @@ def write_to_file(MESSAGE):
         FILE.write(MESSAGE)
 
 # main
-# def main():
-with open(DEBUG_FILE, "w") as FILE:
-    FILE.write("")
-video_recorder.initialize(R2C)
-analyzer.initialize(C2A, A2C)
-while True:
-    # if CONTROLLER_STOP.is_set():
-    #     break
-    FRAME = R2C.get(timeout=0.5)
-    C2A.put(FRAME)
-    try:
-        RESPONSE = A2C.get(timeout=0.5)
-        if RESPONSE['FRAME']['FRAME'] is None:
-            MESSAGE = f"RESULT IS: FRAME ID {RESPONSE['FRAME']['ID']}, {RESPONSE['LANDMARK']}, FRAME {RESPONSE['FRAME']['FRAME']}\n"
-        else:
-            MESSAGE = f"RESULT IS: FRAME ID {RESPONSE['FRAME']['ID']}, {RESPONSE['LANDMARK']}, FRAME PRESENT\n"
-        write_to_file(MESSAGE)
-    except queue.Empty:
-        continue
-    if keyboard.is_pressed('q'):
-        video_recorder.clean_up()
-        analyzer.clean_up(C2A)
-        clean_up()
-        break
+def main(C2C):
+    global ACTIVE
+    with open(DEBUG_FILE, "w") as FILE:
+        FILE.write("")
+    video_recorder.initialize(R2C)
+    analyzer.initialize(C2A, A2C)
+    CYCLE_START = time.monotonic()
+    while True:
+        ANALYSIS_START = time.monotonic()
+        elapsed = ANALYSIS_START - CYCLE_START
+        if elapsed >= ANALYSIS_CYCLE:
+            CYCLE_START = ANALYSIS_START
+            BUFFER.clear()
+            ACTIVE = True
+        elif elapsed >= ANALYSIS_WINDOW:
+            ACTIVE = False
+        if CONTROLLER_STOP.is_set():
+            break
+        try:
+            FRAME = R2C.get(timeout=0.2)
+        except queue.Empty:
+            continue
+        try:
+            C2A.put(FRAME, timeout=0.2)
+        except queue.Full:
+            continue
+        if ACTIVE:
+            try:
+                RESPONSE = A2C.get(timeout=0.2)
+                if RESPONSE['FRAME']['FRAME'] is None:
+                    MESSAGE = f"RESULT IS: FRAME ID {RESPONSE['FRAME']['ID']}, {RESPONSE['LANDMARK']}, FRAME {RESPONSE['FRAME']['FRAME']}\n"
+                else:
+                    MESSAGE = f"RESULT IS: FRAME ID {RESPONSE['FRAME']['ID']}, {RESPONSE['LANDMARK']}, FRAME PRESENT\n"
+                    BUFFER.append(RESPONSE)
+                write_to_file(MESSAGE)
+            except queue.Empty:
+                continue
+        elif not ACTIVE and BUFFER:
+            # print("SENDING TO CPM")
+            C2C.put({
+                "BUFFER": BUFFER.copy(),
+                "SOURCE": 1,
+                "TIMESTAMP": CYCLE_START,
+            }, block=False)
+            BUFFER.clear()
