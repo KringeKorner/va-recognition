@@ -1,0 +1,205 @@
+BATCH ID: 291 HAD A RESULT OF: 
+    neutral 
+    80.95% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 2
+---------------------------------------------
+BATCH ID: 348 HAD A RESULT OF: 
+    happy 
+    93.32% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 1
+---------------------------------------------
+BATCH ID: 434 HAD A RESULT OF: 
+    neutral 
+    75.71% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 532 HAD A RESULT OF: 
+    neutral 
+    95.76% 
+BASED ON A SAMPLE OF 6 WITH AN OCCURANCE OF 4
+---------------------------------------------
+BATCH ID: 602 HAD A RESULT OF: 
+    neutral 
+    77.24% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 5
+---------------------------------------------
+BATCH ID: 696 HAD A RESULT OF: 
+    neutral 
+    99.65% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 4
+---------------------------------------------
+BATCH ID: 783 HAD A RESULT OF: 
+    happy 
+    74.32% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 2
+---------------------------------------------
+BATCH ID: 878 HAD A RESULT OF: 
+    neutral 
+    97.75% 
+BASED ON A SAMPLE OF 6 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 958 HAD A RESULT OF: 
+    neutral 
+    97.16% 
+BASED ON A SAMPLE OF 6 WITH AN OCCURANCE OF 6
+---------------------------------------------
+BATCH ID: 1022 HAD A RESULT OF: 
+    neutral 
+    67.31% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 4
+---------------------------------------------
+BATCH ID: 1112 HAD A RESULT OF: 
+    sad 
+    97.96% 
+BASED ON A SAMPLE OF 5 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 1184 HAD A RESULT OF: 
+    sad 
+    86.09% 
+BASED ON A SAMPLE OF 5 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 1263 HAD A RESULT OF: 
+    neutral 
+    79.22% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 4
+---------------------------------------------
+BATCH ID: 1342 HAD A RESULT OF: 
+    neutral 
+    82.9% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 4
+---------------------------------------------
+BATCH ID: 1421 HAD A RESULT OF: 
+    neutral 
+    85.8% 
+BASED ON A SAMPLE OF 5 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 1508 HAD A RESULT OF: 
+    fear 
+    76.5% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 1584 HAD A RESULT OF: 
+    sad 
+    73.21% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 1
+---------------------------------------------
+BATCH ID: 1670 HAD A RESULT OF: 
+    neutral 
+    93.17% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 2
+---------------------------------------------
+BATCH ID: 1752 HAD A RESULT OF: 
+    neutral 
+    74.77% 
+BASED ON A SAMPLE OF 2 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 1841 HAD A RESULT OF: 
+    neutral 
+    76.4% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 2
+---------------------------------------------
+BATCH ID: 1923 HAD A RESULT OF: 
+    neutral 
+    77.44% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 2
+---------------------------------------------
+BATCH ID: 2018 HAD A RESULT OF: 
+    neutral 
+    62.02% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 1
+---------------------------------------------
+BATCH ID: 2097 HAD A RESULT OF: 
+    neutral 
+    99.52% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 2181 HAD A RESULT OF: 
+    neutral 
+    76.36% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 2261 HAD A RESULT OF: 
+    neutral 
+    82.15% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 2356 HAD A RESULT OF: 
+    neutral 
+    62.74% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 2
+---------------------------------------------
+BATCH ID: 2439 HAD A RESULT OF: 
+    neutral 
+    99.49% 
+BASED ON A SAMPLE OF 1 WITH AN OCCURANCE OF 2
+---------------------------------------------
+BATCH ID: 2531 HAD A RESULT OF: 
+    angry 
+    43.05% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 1
+---------------------------------------------
+BATCH ID: 2614 HAD A RESULT OF: 
+    fear 
+    93.24% 
+BASED ON A SAMPLE OF 2 WITH AN OCCURANCE OF 2
+---------------------------------------------
+BATCH ID: 2704 HAD A RESULT OF: 
+    fear 
+    73.34% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 1
+---------------------------------------------
+BATCH ID: 2791 HAD A RESULT OF: 
+    neutral 
+    67.55% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 2883 HAD A RESULT OF: 
+    neutral 
+    97.04% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 2
+---------------------------------------------
+BATCH ID: 2963 HAD A RESULT OF: 
+    neutral 
+    78.1% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 2
+---------------------------------------------
+BATCH ID: 3037 HAD A RESULT OF: 
+    sad 
+    64.25% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 3124 HAD A RESULT OF: 
+    neutral 
+    99.31% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 3210 HAD A RESULT OF: 
+    neutral 
+    97.62% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 3299 HAD A RESULT OF: 
+    happy 
+    99.72% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 2
+---------------------------------------------
+BATCH ID: 3377 HAD A RESULT OF: 
+    happy 
+    99.87% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 3
+---------------------------------------------
+BATCH ID: 3462 HAD A RESULT OF: 
+    neutral 
+    86.27% 
+BASED ON A SAMPLE OF 2 WITH AN OCCURANCE OF 2
+---------------------------------------------
+BATCH ID: 3524 HAD A RESULT OF: 
+    sad 
+    99.57% 
+BASED ON A SAMPLE OF 3 WITH AN OCCURANCE OF 1
+---------------------------------------------
+BATCH ID: 3606 HAD A RESULT OF: 
+    happy 
+    89.58% 
+BASED ON A SAMPLE OF 4 WITH AN OCCURANCE OF 2
+---------------------------------------------
