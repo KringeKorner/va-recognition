@@ -4,7 +4,6 @@ from video_module import analyzer
 from video_module import debugger
 from video_module import video_recorder
 import cv2 as cv
-import keyboard
 import os
 import time
 import threading
@@ -19,7 +18,7 @@ BUFFER = []
 CONTROLLER_STOP = threading.Event()
 CONTROLLER_THREAD = None
 DEBUG_DIR = os.path.join(BASE_DIR, "DEBUG")
-DEBUG_FILE = os.path.join(DEBUG_DIR, "CONTROLLER_LOG.txt")
+DEBUG_FILE = os.path.join(DEBUG_DIR, "VIDEO_CONTROLLER_LOG.txt")
 FRAMES = []
 
 # queues
@@ -28,10 +27,10 @@ C2A = Queue(maxsize=1)
 A2C = Queue(maxsize=1)
 
 # helper functions
-def initialize(C2C):
+def initialize(VC2C):
     global CONTROLLER_THREAD
-    print("INITIALIZING CONTROLLER")
-    CONTROLLER_THREAD = threading.Thread(target=main, args=(C2C,), daemon=False)
+    print("INITIALIZING VIDEO CONTROLLER")
+    CONTROLLER_THREAD = threading.Thread(target=main, args=(VC2C,), daemon=False)
     CONTROLLER_THREAD.start()
 
 def clean_up():
@@ -42,7 +41,7 @@ def clean_up():
         print("STOPPING THREAD")
         CONTROLLER_THREAD.join(timeout=2.0)
         print("THREAD ALIVE:", CONTROLLER_THREAD.is_alive())
-    print("SHUTTING DOWN CONTROLLER")
+    print("SHUTTING DOWN VIDEO CONTROLLER")
     while not R2C.empty():
         try:
             _ = R2C.get_nowait()
@@ -53,14 +52,14 @@ def clean_up():
             _ = A2C.get_nowait()
         except queue.Empty:
             break
-    print("CONTROLLER TERMINATED")
+    print("VIDEO CONTROLLER TERMINATED")
 
 def write_to_file(MESSAGE):
     with open(DEBUG_FILE, "a") as FILE:
         FILE.write(MESSAGE)
 
 # main
-def main(C2C):
+def main(VC2C):
     global ACTIVE
     with open(DEBUG_FILE, "w") as FILE:
         FILE.write("")
@@ -99,9 +98,13 @@ def main(C2C):
                 continue
         elif not ACTIVE and BUFFER:
             # print("SENDING TO CPM")
-            C2C.put({
-                "BUFFER": BUFFER.copy(),
-                "SOURCE": 1,
-                "TIMESTAMP": CYCLE_START,
-            }, block=False)
+            if not CONTROLLER_STOP.is_set():
+                try:
+                    VC2C.put({
+                        "BUFFER": BUFFER.copy(),
+                        "SOURCE": 1,
+                        "TIMESTAMP": CYCLE_START,
+                    }, block=False)
+                except queue.Full:
+                    pass
             BUFFER.clear()

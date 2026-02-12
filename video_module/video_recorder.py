@@ -26,10 +26,10 @@ def initialize(QUEUE):
     RECORDER_THREAD.start()
 
 def clean_up():
-    print("STOPPING RECORDING")
+    print("STOPPING VIDEO RECORDING")
     RECORDING_STOP.set()
     if STREAM is not None:
-        print("STOPPING RECORDER")
+        print("STOPPING VIDEO RECORDER")
         STREAM.stop()
         if hasattr(STREAM, "stream") and hasattr(STREAM.stream, "release"):
             STREAM.stream.release()
@@ -37,7 +37,7 @@ def clean_up():
         print("STOPPING THREAD")
         RECORDER_THREAD.join(timeout=2.0)
         print("THREAD ALIVE:", RECORDER_THREAD.is_alive())
-    print("RECORDER TERMINATED")
+    print("VIDEO RECORDER TERMINATED")
     time.sleep(1.0)
 
 # main
