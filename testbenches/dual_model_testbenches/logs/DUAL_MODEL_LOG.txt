@@ -1,0 +1,71 @@
+DEMO PROGRAM TO RUN PARALLEL AI.
+POC TEST ONLY, ACCURACY NOT TESTED.
+---------------------------------------------
+2026-02-12 12:43:27 | INITIALIZING AAI
+---------------------------------------------
+2026-02-12 12:43:27 | INITIALIZING VAI
+---------------------------------------------
+2026-02-12 12:43:27 | WAITING ON MODEL READY
+---------------------------------------------
+2026-02-12 12:44:04 | RUNNING VAI WARMUP
+---------------------------------------------
+2026-02-12 12:44:14 | RUNNING AAI WARMUP
+---------------------------------------------
+2026-02-12 12:44:15 | LAUNCHING MODELS
+---------------------------------------------
+2026-02-12 12:44:16 | VAI | Produced results:
+Emotion: neutral, confidence: 97.334 in 0.928s
+Item 1 of 5
+---------------------------------------------
+2026-02-12 12:44:16 | VAI | Produced results:
+Emotion: neutral, confidence: 98.918 in 0.446s
+Item 2 of 5
+---------------------------------------------
+2026-02-12 12:44:16 | VAI | Produced results:
+Emotion: neutral, confidence: 99.407 in 0.321s
+Item 3 of 5
+---------------------------------------------
+2026-02-12 12:44:16 | AAI | Produced results:
+Emotion: neutral, confidence: 0.555 in 1.758s
+Item 1 of 3
+---------------------------------------------
+2026-02-12 12:44:19 | VAI | Produced results:
+Emotion: neutral, confidence: 97.2 in 2.347s
+Item 4 of 5
+---------------------------------------------
+2026-02-12 12:44:20 | AAI | Produced results:
+Emotion: sad, confidence: 0.944 in 3.403s
+Item 2 of 3
+---------------------------------------------
+2026-02-12 12:44:21 | VAI | Produced results:
+Emotion: neutral, confidence: 97.745 in 2.19s
+Item 5 of 5
+---------------------------------------------
+2026-02-12 12:44:22 | VAI | Produced results:
+Emotion: neutral, confidence: 97.334 in 0.766s
+Item 1 of 5
+---------------------------------------------
+2026-02-12 12:44:22 | VAI | Produced results:
+Emotion: neutral, confidence: 98.918 in 0.294s
+Item 2 of 5
+---------------------------------------------
+2026-02-12 12:44:22 | VAI | Produced results:
+Emotion: neutral, confidence: 99.407 in 0.235s
+Item 3 of 5
+---------------------------------------------
+2026-02-12 12:44:24 | VAI | Produced results:
+Emotion: neutral, confidence: 97.2 in 1.036s
+Item 4 of 5
+---------------------------------------------
+2026-02-12 12:44:25 | VAI | Produced results:
+Emotion: neutral, confidence: 97.745 in 1.662s
+Item 5 of 5
+---------------------------------------------
+2026-02-12 12:44:26 | SHUTTING DOWN VAI
+---------------------------------------------
+2026-02-12 12:44:26 | VAI TERMINATED
+---------------------------------------------
+2026-02-12 12:44:27 | SHUTTING DOWN AAI
+---------------------------------------------
+2026-02-12 12:44:27 | AAI TERMINATED
+---------------------------------------------

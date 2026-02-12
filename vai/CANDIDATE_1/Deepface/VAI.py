@@ -48,7 +48,7 @@ def clean_up(C2V, VAI_HALT):
 
 # main
 def main(C2V, V2C, VAI_HALT, VAI_READY):
-    print("INITIATING WARMUP SEQUENCE")
+    print("INITIATING VAI WARMUP SEQUENCE")
     DeepFace.analyze(
         img_path=np.zeros((224, 224, 3), dtype=np.uint8),
         actions=['emotion'],
