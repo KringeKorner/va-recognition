@@ -9,9 +9,10 @@ SER = AutoModel(
 
 fs = 16000
 duration = 3
+deviceSource = 1 # windows
 
 print('Starting recording')
-recording = sd.rec(int(duration*fs), samplerate=fs, channels=2)
+recording = sd.rec(int(duration*fs), samplerate=fs, channels=1, device=deviceSource)
 sd.wait()
 print('Recording terminated, playing back file')
 time.sleep(1)
@@ -32,4 +33,4 @@ scores = [round(score, 3) for score in result[0]['scores']]
 scores.pop()
 confidence = max(scores)
 emotion = labels[scores.index(confidence)]
-print(f'Selected {emotion} with confidence {confidence}%')
+print(f'Selected {emotion} with confidence {confidence*100}%')

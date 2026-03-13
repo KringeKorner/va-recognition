@@ -1,0 +1,15 @@
+(walle) walle@walle:~/testbenches/peripheral_tests $ python haar_live_testbench.py
+/home/walle/testbenches/peripheral_tests
+[INFO] loading haar cascades...
+[ERROR:0@0.105] global persistence.cpp:566 open Can't open file: '/home/walle/testbenches/peripheral_tests/cascades/haarcascade_frontalface_default.xml' in read mode
+[ERROR:0@0.105] global persistence.cpp:566 open Can't open file: '/home/walle/testbenches/peripheral_tests/cascades/haarcascade_eye.xml' in read mode
+[ERROR:0@0.105] global persistence.cpp:566 open Can't open file: '/home/walle/testbenches/peripheral_tests/cascades/haarcascade_smile.xml' in read mode
+[INFO] starting video stream...
+Traceback (most recent call last):
+  File "/home/walle/testbenches/peripheral_tests/haar_live_testbench.py", line 53, in <module>
+    faceRects = detectors["face"].detectMultiScale(
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cv2.error: OpenCV(4.13.0) /io/opencv/modules/objdetect/src/cascadedetect.cpp:1689: error: (-215:Assertion failed) !empty() in function 'detectMultiScale'
+
+FATAL: exception not rethrown
+Aborted

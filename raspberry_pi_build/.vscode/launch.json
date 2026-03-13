@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run CPM",
+      "type": "python",
+      "request": "launch",
+      "module": "cpm.central_processing_module",
+      "cwd": "/home/pi/va-recognition",
+      "env": {
+        "PYTHONPATH": "/home/pi/va-recognition"
+      },
+      "console": "integratedTerminal"
+    }
+  ]
+}
