@@ -1,5 +1,3 @@
-# imports
-# TEMP
 from contextlib import redirect_stdout, redirect_stderr
 from funasr import AutoModel
 from multiprocessing import Event, Process
@@ -7,10 +5,9 @@ from multiprocessing.queues import Full, Empty
 from pathlib import Path
 import numpy as np
 import time
-# TEMP
-import sys, os, io
+import os
+import io
 
-#vars
 EMOTION_ORDER = [
     "angry",
     "disgust",
@@ -30,13 +27,11 @@ LABEL_MAP = {
     "surprised": "surprise",
     "other": "other"
 }
-EMOTIONS = []
-RESULTS = []
-RTFS = []
-root_path = Path(__file__).resolve().parent.parent.parent.parent
-sample_path = Path(root_path) / 'databases' / 'recording_tests' / 'sample_1.wav'
 
-# helper functions
+root_path = Path(__file__).resolve().parents[3]
+sample_path = root_path / "databases" / "recording_tests" / "sample_1.wav"
+DEVNULL = open(os.devnull, "w")
+
 def initialize(C2A, A2C, AAI_HALT, AAI_READY):
     global AAI
     print("STARTING AAI")
@@ -54,14 +49,15 @@ def clean_up(C2A, AAI_HALT):
             break
     print("AAI TERMINATED")
 
+
 def normalize_aai(labels, scores):
     mapped = {}
     for lbl, score in zip(labels, scores):
-        new_lbl = LABEL_MAP[lbl]
+        new_lbl = LABEL_MAP.get(lbl, "other")
         if new_lbl == "other":
             continue
         mapped[new_lbl] = score
-    ordered_scores = [mapped[e] for e in EMOTION_ORDER]
+    ordered_scores = [mapped.get(e, 0.0) for e in EMOTION_ORDER]
     return EMOTION_ORDER, ordered_scores
 
 def average(emotion_spread):
@@ -69,15 +65,14 @@ def average(emotion_spread):
     scores_array = np.array([s[1] for s in emotion_spread])
     avg_scores = np.round(np.mean(scores_array, axis=0), 3).tolist()
     RESULT = {
-        'LABELS' : labels,
-        'AVG_CONF' : avg_scores
+        "LABELS": labels,
+        "AVG_CONF": avg_scores
     }
     return RESULT
 
-# TEMP, TO BE REMOVED
+
 def generate_silent(model, audio):
-    f = io.StringIO()
-    with redirect_stdout(f), redirect_stderr(f):
+    with redirect_stdout(DEVNULL), redirect_stderr(DEVNULL):
         result = model.generate(
             audio,
             granularity="utterance",
@@ -85,20 +80,24 @@ def generate_silent(model, audio):
         )
     return result
 
-# main
+
 def main(C2A, A2C, AAI_HALT, AAI_READY):
     print("INITIATING AAI WARMUP SEQUENCE")
+
+    if not sample_path.exists():
+        raise FileNotFoundError(f"AAI warmup sample missing: {sample_path}")
     SER = AutoModel(
-        model = "emotion2vec_plus_large",
-        disable_update = True,
+        model="emotion2vec_plus_large",
+        disable_update=True,
     )
-    result = SER.generate(
+    SER.generate(
         str(sample_path),
         granularity="utterance",
         extract_embedding=False,
     )
     AAI_READY.set()
     print("AAI ONLINE\n")
+    EMOTIONS = []
     while not AAI_HALT.is_set():
         try:
             AUDIOS = C2A.get(timeout=0.2)
@@ -106,9 +105,9 @@ def main(C2A, A2C, AAI_HALT, AAI_READY):
                 continue
             for AUDIO in AUDIOS:
                 result = generate_silent(SER, AUDIO)
-                labels = [lbl.split('/')[-1] for lbl in result[0]['labels']]
+                labels = [lbl.split("/")[-1] for lbl in result[0]["labels"]]
                 labels.pop()
-                scores = [float(score*100) for score in result[0]['scores']]
+                scores = [float(score * 100) for score in result[0]["scores"]]
                 scores.pop()
                 labels, scores = normalize_aai(labels, scores)
                 EMOTIONS.append([labels, scores])

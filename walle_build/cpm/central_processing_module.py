@@ -14,82 +14,75 @@ import threading
 import queue
 
 # vars
-AAI_HALT = multiprocessing.Event()
-AAI_READY = multiprocessing.Event()
-AUDIOS = []
-BATCH_ID = 0
-CPM_HALT = threading.Event()
-VC2C_MAX = 30
-FRAMES = []
-VAI_HALT = multiprocessing.Event()
-VAI_READY = multiprocessing.Event()
-ROOT_PATH = Path(__file__).resolve().parent
-DEBUG_PATH = Path(ROOT_PATH).parent / 'video_module' / 'DEBUG'
-CPM_LOGGER_PATH = Path(DEBUG_PATH) / 'CPM_LOGGER.txt'
+AAI_HALT=multiprocessing.Event()
+AAI_READY=multiprocessing.Event()
+AUDIOS=[]
+BATCH_ID=0
+CPM_HALT=threading.Event()
+VC2C_MAX=30
+FRAMES=[]
+VAI_HALT=multiprocessing.Event()
+VAI_READY=multiprocessing.Event()
+ROOT_PATH=Path(__file__).resolve().parent
+DEBUG_PATH=Path(ROOT_PATH).parent/'video_module'/'DEBUG'
+CPM_LOGGER_PATH=DEBUG_PATH/'CPM_LOGGER.txt'
 
 # queues
-VC2C = Queue(maxsize=1)
-AC2C = Queue(maxsize=1)
-C2D = Queue(maxsize=1)
-C2V = multiprocessing.Queue(maxsize=1)
-C2A = multiprocessing.Queue(maxsize=1)
-V2C = multiprocessing.Queue(maxsize=1)
-A2C = multiprocessing.Queue(maxsize=1)
+VC2C=Queue(maxsize=1)
+AC2C=Queue(maxsize=1)
+C2D=Queue(maxsize=1)
+C2V=multiprocessing.Queue(maxsize=1)
+C2A=multiprocessing.Queue(maxsize=1)
+V2C=multiprocessing.Queue(maxsize=1)
+A2C=multiprocessing.Queue(maxsize=1)
 
 # classes
 class SOURCE(Enum):
-    NONE = 0
-    VIDEO = 1
-    AUDIO = 2
+    NONE=0
+    VIDEO=1
+    AUDIO=2
 
 # helper functions
 def clean_up():
     print("SHUTTING DOWN CPM")
     data_dispatcher.clean_up(C2D)
-    VAI.clean_up(C2V, VAI_HALT)
-    AAI.clean_up(C2A, AAI_HALT)
+    VAI.clean_up(C2V,VAI_HALT)
+    AAI.clean_up(C2A,AAI_HALT)
     video_controller.clean_up()
     audio_controller.clean_up()
     while not VC2C.empty():
-        try:
-            _ = VC2C.get_nowait()
-        except queue.Empty:
-            break
+        try:_=VC2C.get_nowait()
+        except queue.Empty:break
     while not V2C.empty():
-        try:
-            _ = V2C.get_nowait()
-        except queue.Empty:
-            break
+        try:_=V2C.get_nowait()
+        except queue.Empty:break
     while not AC2C.empty():
-        try:
-            _ = AC2C.get_nowait()
-        except queue.Empty:
-            break
+        try:_=AC2C.get_nowait()
+        except queue.Empty:break
     print("CPM TERMINATED")
 
 def write_to_file(MESSAGE):
-    with open(CPM_LOGGER_PATH, "a") as FILE:
-        FILE.write(MESSAGE)
+    with open(CPM_LOGGER_PATH,"a") as FILE:FILE.write(MESSAGE)
 
-def fusion(vlabels, alabels, vai_results, aai_results):
-    a_weight = 0.538
-    v_weight = 0.462
-    if vai_results == 0 and aai_results == 0:
-        final_conf = 0
-        final_mood = "NONE"
-    elif vai_results == 0 and aai_results != 0:
-        final_conf = max(aai_results)
-        final_mood = alabels[aai_results.index(final_conf)]
-    elif vai_results != 0 and aai_results == 0:
-        final_conf = max(vai_results)
-        final_mood = vlabels[vai_results.index(final_conf)]
+def fusion(vlabels,alabels,vai_results,aai_results):
+    a_weight=0.538
+    v_weight=0.462
+    if vai_results==0 and aai_results==0:
+        final_conf=0
+        final_mood="NONE"
+    elif vai_results==0 and aai_results!=0:
+        final_conf=max(aai_results)
+        final_mood=alabels[aai_results.index(final_conf)]
+    elif vai_results!=0 and aai_results==0:
+        final_conf=max(vai_results)
+        final_mood=vlabels[vai_results.index(final_conf)]
     else:
-        weighted_AAI = [a * a_weight for a in aai_results]
-        weighted_VAI = [v * v_weight for v in vai_results]
-        fused_conf = [round((v + a), 3) for v, a in zip(weighted_VAI, weighted_AAI)]
-        final_conf = max(fused_conf)
-        final_mood = vlabels[fused_conf.index(final_conf)]
-    return(final_mood, final_conf)
+        weighted_AAI=[a*a_weight for a in aai_results]
+        weighted_VAI=[v*v_weight for v in vai_results]
+        fused_conf=[round((v+a),3) for v,a in zip(weighted_VAI,weighted_AAI)]
+        final_conf=max(fused_conf)
+        final_mood=vlabels[fused_conf.index(final_conf)]
+    return(final_mood,final_conf)
 
 # main
 def main():
@@ -105,10 +98,6 @@ def main():
     data_dispatcher.initialize(C2D)
     try:
         while not CPM_HALT.is_set():
-            if keyboard.is_pressed('q'):
-                CPM_HALT.set()
-                clean_up()
-                break
             try:
                 VIDEO_PACKET = VC2C.get(timeout=0.2)
                 VIDEO_BUFFER_SOURCE = SOURCE(VIDEO_PACKET['SOURCE']).name
@@ -156,19 +145,15 @@ def main():
             except queue.Empty:
                 continue
             mood, confidence = fusion(vlabels, alabels, vac, aac)
-            packet = {
-                'VSOURCE' : VIDEO_BUFFER_SOURCE,
-                'ASOURCE' : AUDIO_BUFFER_SOURCE,
-                'MOOD' : mood,
-                'CONFIDENCE' : confidence,
-            }
+            packet = {'VSOURCE': VIDEO_BUFFER_SOURCE,'ASOURCE': AUDIO_BUFFER_SOURCE,'MOOD': mood,'CONFIDENCE': confidence}
             try:
                 C2D.put(packet, block=False)
             except queue.Full:
                 continue
     except KeyboardInterrupt:
         CPM_HALT.set()
+        clean_up()
 
-if __name__ == "__main__":
+if __name__=="__main__":
     multiprocessing.freeze_support()
     main()
