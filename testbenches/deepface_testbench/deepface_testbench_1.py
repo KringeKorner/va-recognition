@@ -1,12 +1,27 @@
 from deepface import DeepFace
 from pathlib import Path
 import cv2
+import numpy as np
 import time
 
 #paths
 ROOT_PATH = Path(__file__).resolve().parent
 img_path = Path(ROOT_PATH) / "img1.png"
 TEST_DB = Path(ROOT_PATH).parent.parent / 'databases' / 'sample_db'
+
+EMOTIONS = []
+
+def average(emotion_spread):
+    labels = emotion_spread[0][0]
+    scores_array = np.array([s[1] for s in emotion_spread])
+    avg_scores = np.mean(scores_array, axis=0)
+    max_index = np.argmax(avg_scores)
+    RESULT = {
+        'EMOTION' : labels[max_index],
+        'AVG_CONF' : round(float(avg_scores[max_index]), 3),
+        'LABELS' : labels
+    }
+    return RESULT
 
 for img_path in TEST_DB.glob('*.jpg'):
 
@@ -29,8 +44,11 @@ for img_path in TEST_DB.glob('*.jpg'):
 
     print("\nDeepFace Analysis Results:")
     for face in results:
-        emotion_detected = face['dominant_emotion']
-        confidence = face['emotion'][emotion_detected]
-        print(f"Emotion: {emotion_detected} ({confidence:.2f}%) with duration ({duration:.3f}s)")
+        emotions = face['emotion']
+        labels = list(emotions.keys())
+        scores = [round(v, 3) for v in emotions.values()]
+        EMOTIONS.append([labels, scores])
+        result = average(EMOTIONS)
+        EMOTIONS.clear()
 
-# print(results)
+        print(f"Returned {result['EMOTION']} with confidence {result['AVG_CONF']}% in {round(duration, 3)}s")
