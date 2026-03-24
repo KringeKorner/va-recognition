@@ -1,4 +1,5 @@
 # imports
+from debug import logger
 from enum import Enum
 from imutils.video import VideoStream as vs
 from queue import Queue
@@ -25,19 +26,21 @@ class LANDMARK(Enum):
 def clean_up(RECV):
     ANALYSIS_STOP.set()
     if ANALYZER_THREAD is not None:
-        print("SHUTTING DOWN ANALYZER")
+        logger.main('system', 'SHUTTING DOWN ANALYZER')
+        logger.main('video_analyzer', 'SHUTTING DOWN ANALYZER')
         ANALYZER_THREAD.join(timeout=2.0)
-        print("THREAD ALIVE:", ANALYZER_THREAD.is_alive())
     while not RECV.empty():
         try:
             _ = RECV.get_nowait()
         except queue.Empty:
             break
-    print("ANALYZER TERMINATED")
+    logger.main('system', 'ANALYZER TERMINATED')
+    logger.main('video_analyzer', 'ANALYZER TERMINATED')
 
-def initialize(RECV, SEND, POC=False):
+def initialize(RECV, SEND, POC, AI_READY):
     global ANALYZER_THREAD, DETECTORS, FRAME
-    print("INITIALIZING ANALYZER")
+    logger.main('system', 'INITIALIZING ANALYZER')
+    logger.main('video_analyzer', 'INITIALIZING ANALYZER')
     ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
     AP = argparse.ArgumentParser()
     AP.add_argument(
@@ -53,22 +56,22 @@ def initialize(RECV, SEND, POC=False):
         "eyes": "haarcascade_eye.xml",
         "smile": "haarcascade_smile.xml",
     }
-    print("LOADING HCC")
+    logger.main('system', 'LOADING HCC')
+    logger.main('video_analyzer', 'LOADING HCC')
     DETECTORS = {}
     for NAME, PATH in DETECTOR_PATHS.items():
         PATH = os.path.join(ROOT_PATH, ARGS["cascades"], PATH)
         DETECTORS[NAME] = cv.CascadeClassifier(PATH)
-    ANALYZER_THREAD = threading.Thread(
-        target=main, args=(RECV, SEND, POC), daemon=False
-    )
+    ANALYZER_THREAD = threading.Thread(target=main, args=(RECV, SEND, POC, AI_READY), daemon=False, name="analyzer")
     ANALYZER_THREAD.start()
     time.sleep(2.0)
 
 # main
-def main(RECV, SEND, POC):
+def main(RECV, SEND, POC, AI_READY):
     if ANALYZER_THREAD is None:
-        print("INITIALIZATION NEEDED")
+        logger.main('system', 'ANALYZER FAILURE, INITIALIZATION NEEDED')
     else:
+        AI_READY.wait()
         while not ANALYSIS_STOP.is_set():
             if ANALYSIS_STOP.is_set():
                 break
@@ -105,15 +108,17 @@ def main(RECV, SEND, POC):
             if not POC:
                 if len(FACE_RECTS) > 0:
                     if len(EYE_RECTS) > 0 or len(SMILE_RECTS) > 0:
-                        RESPONSE = {"LANDMARK": LANDMARK(3), "FRAME": FRAME}
+                        RESPONSE = {"LANDMARK": LANDMARK(3).name, "FRAME": FRAME}
                     else:
-                        RESPONSE = {"LANDMARK": LANDMARK(2), "FRAME": FRAME}
+                        RESPONSE = {"LANDMARK": LANDMARK(2).name, "FRAME": FRAME}
                 else:
                     RESPONSE = {
-                        "LANDMARK": LANDMARK(1), "FRAME": {"ID": FRAME["ID"], "FRAME": None},
+                        "LANDMARK": LANDMARK(1).name, "FRAME": {"ID": FRAME["ID"], "FRAME": None},
                     }
             else:
                 print("TBD")
+            message = f"ANALYZED FRAME {FRAME['ID']} WITH RESULT {RESPONSE['LANDMARK']}"
+            logger.main('video_analyzer', message)
             try:
                 SEND.put(RESPONSE, block=False)
             except queue.Full:

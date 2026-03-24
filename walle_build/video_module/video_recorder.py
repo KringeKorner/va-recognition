@@ -1,8 +1,6 @@
 # imports
 from imutils.video import VideoStream as vs
-from queue import Queue
-import cv2 as cv
-import os
+from debug import logger
 import threading
 import time
 import queue
@@ -17,38 +15,64 @@ RECORDER_THREAD=None
 STREAM=None
 
 # helper functions
-def initialize(QUEUE):
-    global STREAM,RECORDER_THREAD
-    print("INITIALIZING RECORDING")
+def initialize(QUEUE,AI_READY):
+    global STREAM,RECORDER_THREAD,ID
+    logger.main('system','INITIALIZING VIDEO RECORDER')
+    logger.main('video_recorder','INITIALIZING VIDEO RECORDER')
+    RECORDING_STOP.clear()
+    ID=0
     STREAM=vs(src=CAM_SRC,resolution=CAM_RES,framerate=FRAME_RATE).start()
-    RECORDER_THREAD=threading.Thread(target=main,args=(STREAM,QUEUE),daemon=False)
+    time.sleep(0.5)
+    RECORDER_THREAD=threading.Thread(target=main,args=(STREAM,QUEUE,AI_READY),daemon=False,name="video_recorder_main")
     RECORDER_THREAD.start()
 
 def clean_up():
-    print("STOPPING VIDEO RECORDING")
+    global STREAM,RECORDER_THREAD
+    logger.main('system','STOPPING VIDEO RECORDER')
+    logger.main('video_recorder','STOPPING VIDEO RECORDER')
     RECORDING_STOP.set()
     if STREAM is not None:
-        print("STOPPING VIDEO RECORDER")
+        logger.main('video_recorder','STOPPING VIDEO STREAM')
         STREAM.stop()
-        if hasattr(STREAM,"stream") and hasattr(STREAM.stream,"release"):STREAM.stream.release()
+        if hasattr(STREAM,"stream") and hasattr(STREAM.stream,"isOpened"):
+            if STREAM.stream.isOpened():
+                logger.main('video_recorder','FORCE RELEASING VIDEO CAPTURE')
+                STREAM.stream.release()
     if RECORDER_THREAD is not None:
-        print("STOPPING THREAD")
         RECORDER_THREAD.join(timeout=2.0)
-        print("THREAD ALIVE:",RECORDER_THREAD.is_alive())
-    print("VIDEO RECORDER TERMINATED")
-    time.sleep(1.0)
+        logger.main('video_recorder',f'RECORDER THREAD ALIVE: {RECORDER_THREAD.is_alive()}')
+    logger.main('system','VIDEO RECORDER TERMINATED')
+    logger.main('video_recorder','VIDEO RECORDER TERMINATED')
+    time.sleep(0.5)
 
 # main
-def main(STREAM,QUEUE):
+def main(STREAM,QUEUE,AI_READY):
     global ID
-    if STREAM is None:print("INITIALIZATION REQUIRED")
-    else:
-        while True:
-            if RECORDING_STOP.is_set():break
+    if STREAM is None:
+        logger.main('system','VIDEO RECORDER FAILURE')
+        return
+    while not AI_READY.is_set():
+        if RECORDING_STOP.is_set():
+            return
+        time.sleep(0.05)
+    logger.main('video_recorder','READY RECEIVED')
+    while True:
+        if RECORDING_STOP.is_set():
+            logger.main('video_recorder','STOP DETECTED, EXITING LOOP')
+            break
+        try:
             FRAME=STREAM.read()
-            if FRAME is None:continue
-            try:
-                ID+=1
-                FRAME_SENT={"ID":ID,"FRAME":FRAME}
-                QUEUE.put(FRAME_SENT,block=False)
-            except queue.Full:time.sleep(0.05)
+        except Exception as e:
+            logger.main('video_recorder',f'VIDEO READ ERROR: {e}')
+            time.sleep(0.05)
+            continue
+        if FRAME is None:
+            time.sleep(0.01)
+            continue
+        try:
+            ID+=1
+            FRAME_SENT={"ID":ID,"FRAME":FRAME}
+            logger.main('video_recorder',f'CAPTURED FRAME WITH ID {ID}')
+            QUEUE.put(FRAME_SENT,block=False)
+        except queue.Full:
+            time.sleep(0.01)

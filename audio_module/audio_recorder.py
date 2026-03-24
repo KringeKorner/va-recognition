@@ -1,5 +1,5 @@
 # imports
-import numpy
+from debug import logger
 import sounddevice as sd
 import threading
 import time
@@ -14,25 +14,27 @@ RECORDING_STOP = threading.Event()
 RECORDER_THREAD = None
 
 # helper functions
-def initialize(R2C):
+def initialize(R2C, AI_READY):
     global RECORDER_THREAD
-    print("INITIALIZING AUDIO RECORDING")
-    RECORDER_THREAD = threading.Thread(target=main, args=(R2C,), daemon=False)
+    logger.main('system', 'INITIALIZING AUDIO RECORDING')
+    logger.main('audio_recorder', 'INITIALIZING AUDIO RECORDING')
+    RECORDER_THREAD = threading.Thread(target=main, args=(R2C, AI_READY), daemon=False, name="ar_main")
     RECORDER_THREAD.start()
 
 def clean_up():
-    print("STOPPING AUDIO RECORDING")
+    logger.main('system', 'STOPPING AUDIO RECORDER')
+    logger.main('audio_recorder', 'STOPPING AUDIO RECORDER')
     RECORDING_STOP.set()
     if RECORDER_THREAD is not None:
-        print("STOPPING THREAD")
         RECORDER_THREAD.join(timeout=2.0)
-        print("THREAD ALIVE:", RECORDER_THREAD.is_alive())
-    print("AUDIO RECORDER TERMINATED")
+    logger.main('system', 'AUDIO RECORDER TERMINATED')
+    logger.main('audio_recorder', 'AUDIO RECORDER TERMINATED')
     time.sleep(1.0)
 
 # main
-def main(R2C):
+def main(R2C, AI_READY):
     global ID
+    AI_READY.wait()
     while True:
         if RECORDING_STOP.is_set():
             break
@@ -46,6 +48,8 @@ def main(R2C):
                 "ID": ID,
                 "AUDIO": recording
             }
+            message = f"SENDING AUDIO FILE WITH ID {ID} OF SIZE {recording.shape[0]/fs:.3f}S"
+            logger.main('audio_recorder', message)
             R2C.put(AUDIO_SENT, block=False)
         except queue.Full:
             time.sleep(0.05)

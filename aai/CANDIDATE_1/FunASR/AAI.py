@@ -40,7 +40,7 @@ sample_path = Path(root_path) / 'databases' / 'recording_tests' / 'sample_1.wav'
 def initialize(C2A, A2C, AAI_HALT, AAI_READY):
     global AAI
     print("STARTING AAI")
-    AAI = Process(target=main, args=(C2A, A2C, AAI_HALT, AAI_READY), daemon=False)
+    AAI = Process(target=main, args=(C2A, A2C, AAI_HALT, AAI_READY), daemon=False, name="aai")
     AAI.start()
 
 def clean_up(C2A, AAI_HALT):

@@ -8,7 +8,8 @@ ports = serial.tools.list_ports.comports()
 for port in ports:
     print(port.device, port.description)
 
-PORT = "COM4"
+PORT = "COM11"
+# PORT = "COM4"
 BAUD = 115200
 
 # Open serial port

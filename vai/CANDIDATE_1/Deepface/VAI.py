@@ -13,7 +13,7 @@ EMOTIONS = []
 def initialize(C2V, V2C, VAI_HALT, VAI_READY):
     global VAI
     print("STARTING VAI")
-    VAI = Process(target=main, args=(C2V,V2C,VAI_HALT,VAI_READY), daemon=False)
+    VAI = Process(target=main, args=(C2V,V2C,VAI_HALT,VAI_READY), daemon=False, name="vai")
     VAI.start()
 
 def average(emotion_spread):

@@ -2,13 +2,13 @@
 from aai.CANDIDATE_1.FunASR import AAI
 from audio_module import audio_controller
 from cpm import data_dispatcher
+from cpm import scheduler
+from debug import logger
 from enum import Enum
 from pathlib import Path
 from vai.CANDIDATE_1.Deepface import VAI
 from video_module import video_controller
 from queue import Queue
-import cv2 as cv
-import keyboard
 import multiprocessing
 import threading
 import queue
@@ -16,16 +16,15 @@ import queue
 # vars
 AAI_HALT=multiprocessing.Event()
 AAI_READY=multiprocessing.Event()
+AI_READY=threading.Event()
+analysis_cycle=0
 AUDIOS=[]
-BATCH_ID=0
 CPM_HALT=threading.Event()
 VC2C_MAX=30
 FRAMES=[]
 VAI_HALT=multiprocessing.Event()
 VAI_READY=multiprocessing.Event()
 ROOT_PATH=Path(__file__).resolve().parent
-DEBUG_PATH=Path(ROOT_PATH).parent/'video_module'/'DEBUG'
-CPM_LOGGER_PATH=DEBUG_PATH/'CPM_LOGGER.txt'
 
 # queues
 VC2C=Queue(maxsize=1)
@@ -42,117 +41,183 @@ class SOURCE(Enum):
     VIDEO=1
     AUDIO=2
 
-# helper functions
+class Flags:
+    frames_arrived=False
+    VAI_arrived=False
+    audio_arrived=False
+    AAI_arrived=False
+flags=Flags()
+
+# helper
 def clean_up():
-    print("SHUTTING DOWN CPM")
-    data_dispatcher.clean_up(C2D)
-    VAI.clean_up(C2V,VAI_HALT)
-    AAI.clean_up(C2A,AAI_HALT)
+    logger.main('system','SHUTTING DOWN CPM')
+    logger.main('cpm','SHUTTING DOWN CPM')
+    scheduler.clean_up()
     video_controller.clean_up()
     audio_controller.clean_up()
+    VAI.clean_up(C2V,VAI_HALT)
+    AAI.clean_up(C2A,AAI_HALT)
+    data_dispatcher.clean_up(C2D)
     while not VC2C.empty():
-        try:_=VC2C.get_nowait()
-        except queue.Empty:break
+        try:
+            VC2C.get_nowait()
+        except queue.Empty:
+            break
     while not V2C.empty():
-        try:_=V2C.get_nowait()
-        except queue.Empty:break
+        try:
+            V2C.get_nowait()
+        except queue.Empty:
+            break
     while not AC2C.empty():
-        try:_=AC2C.get_nowait()
-        except queue.Empty:break
-    print("CPM TERMINATED")
-
-def write_to_file(MESSAGE):
-    with open(CPM_LOGGER_PATH,"a") as FILE:FILE.write(MESSAGE)
+        try:
+            AC2C.get_nowait()
+        except queue.Empty:
+            break
+    logger.main('system','CPM TERMINATED')
+    logger.main('cpm','CPM TERMINATED')
 
 def fusion(vlabels,alabels,vai_results,aai_results):
     a_weight=0.538
     v_weight=0.462
     if vai_results==0 and aai_results==0:
-        final_conf=0
-        final_mood="NONE"
-    elif vai_results==0 and aai_results!=0:
-        final_conf=max(aai_results)
-        final_mood=alabels[aai_results.index(final_conf)]
-    elif vai_results!=0 and aai_results==0:
-        final_conf=max(vai_results)
-        final_mood=vlabels[vai_results.index(final_conf)]
-    else:
-        weighted_AAI=[a*a_weight for a in aai_results]
-        weighted_VAI=[v*v_weight for v in vai_results]
-        fused_conf=[round((v+a),3) for v,a in zip(weighted_VAI,weighted_AAI)]
-        final_conf=max(fused_conf)
-        final_mood=vlabels[fused_conf.index(final_conf)]
-    return(final_mood,final_conf)
+        logger.main('cpm',"NONE CASE RECEIVED FOR FUSION, RETURNING NONE CASE")
+        return "NONE",0
+    if vai_results==0:
+        m=max(aai_results)
+        logger.main('cpm',"AUDIO ONLY RECEIVED, GRANTING FULL WEIGHTING TO AUDIO")
+        logger.main('cpm',f"PRODUCED FINAL RESULT {alabels[aai_results.index(m)]} WITH CONFIDENCE {m}%")
+        return alabels[aai_results.index(m)],m
+    if aai_results==0:
+        m=max(vai_results)
+        logger.main('cpm',"VIDEO ONLY RECEIVED, GRANTING FULL WEIGHTING TO VIDEO")
+        logger.main('cpm',f"PRODUCED FINAL RESULT {vlabels[vai_results.index(m)]} WITH CONFIDENCE {m}%")
+        return vlabels[vai_results.index(m)],m
+    wa=[a*a_weight for a in aai_results]
+    wv=[v*v_weight for v in vai_results]
+    fused=[round(v+a,3) for v,a in zip(wv,wa)]
+    m=max(fused)
+    logger.main('cpm',f"AUDIO AND VIDEO SOURCES RECEIVED, FUSING WITH {a_weight}/{v_weight} WEIGHTING SPLIT")
+    logger.main('cpm',f"PRODUCED FINAL RESULT {vlabels[fused.index(m)]} WITH CONFIDENCE {m}%")
+    return vlabels[fused.index(m)],m
 
 # main
 def main():
-    global BATCH_ID
-    with open(CPM_LOGGER_PATH, "w") as FILE:
-        FILE.write("")
-    VAI.initialize(C2V, V2C, VAI_HALT, VAI_READY)
-    AAI.initialize(C2A, A2C, AAI_HALT, AAI_READY)
+    global analysis_cycle
+    logger.main('system','INITIALIZING CPM')
+    logger.main('cpm','INITIALIZING CPM')
+    logger.main('system','INITIATING BOOT SEQUENCES')
+    logger.main('cpm','INITIATING BOOT SEQUENCES')
+    logger.initialize()
+    VAI.initialize(C2V,V2C,VAI_HALT,VAI_READY)
+    AAI.initialize(C2A,A2C,AAI_HALT,AAI_READY)
     VAI_READY.wait()
     AAI_READY.wait()
-    video_controller.initialize(VC2C)
-    audio_controller.initialize(AC2C)
-    data_dispatcher.initialize(C2D)
+    logger.main('system','AI MODELS READY')
+    logger.main('cpm','AI MODELS READY')
+    AI_READY.set()
+    video_controller.initialize(VC2C,AI_READY)
+    audio_controller.initialize(AC2C,AI_READY)
+    data_dispatcher.initialize(C2D,AI_READY)
+    scheduler.initialize()
     try:
         while not CPM_HALT.is_set():
-            try:
-                VIDEO_PACKET = VC2C.get(timeout=0.2)
-                VIDEO_BUFFER_SOURCE = SOURCE(VIDEO_PACKET['SOURCE']).name
-                if VIDEO_PACKET['BUFFER'] is None:
-                    vlabels = None
-                    vac = 0
-                    VIDEO_BUFFER_SOURCE = "NONE"
-                else:
-                    for RESPONSE in VIDEO_PACKET['BUFFER']:
-                        FRAMES.append(RESPONSE['FRAME']['FRAME'])
+            vlabels,vac=None,0
+            alabels,aac=None,0
+            VIDEO_BUFFER_SOURCE,AUDIO_BUFFER_SOURCE="NONE","NONE"
+            FRAMES.clear()
+            AUDIOS.clear()
+            analysis_cycle+=1
+            logger.main('cpm',f"INITIATING ANALYSIS CYCLE {analysis_cycle}")
+            scheduler.signals.frames_arrive.wait()
+            flags.frames_arrived=False
+            latest_video_pkt=None
+            while scheduler.signals.frames_arrive.is_set():
+                try:
+                    latest_video_pkt=VC2C.get(timeout=0.01)
+                except queue.Empty:
+                    continue
+            if latest_video_pkt is not None and latest_video_pkt['BUFFER'] is not None:
+                VIDEO_BUFFER_SOURCE=SOURCE(latest_video_pkt['SOURCE']).name
+                for f in latest_video_pkt['BUFFER']:
+                    FRAMES.append(f['FRAME']['FRAME'])
+                flags.frames_arrived=True
+                logger.main('cpm',f"RECEIVED BUFFER FROM SOURCE {VIDEO_BUFFER_SOURCE} OF SIZE {len(latest_video_pkt['BUFFER'])}")
+                logger.main('cpm',f"BUFFER HAS ID {latest_video_pkt['BATCH']} CONTAINING FRAME ID(S) {', '.join(str(p['FRAME']['ID']) for p in latest_video_pkt['BUFFER'])}")
+            else:
+                VIDEO_BUFFER_SOURCE="NONE"
+                logger.main('cpm',"RECEIVED EMPTY BUFFER FROM VIDEO SOURCE")
+            scheduler.signals.vai_return.wait()
+            flags.VAI_arrived=False
+            if FRAMES:
+                try:
+                    C2V.put(FRAMES.copy(),block=False)
+                    FRAMES.clear()
+                except multiprocessing.queues.Full:
+                    FRAMES.clear()
+                while scheduler.signals.vai_return.is_set():
                     try:
-                        C2V.put(FRAMES.copy(), block=False)
-                    except multiprocessing.queues.Full:
-                        FRAMES.clear()
-                    try:
-                        V_RESULT = V2C.get(timeout=0.2)
-                        vlabels = V_RESULT['LABELS']
-                        vac = V_RESULT['AVG_CONF']
+                        res=V2C.get(timeout=0.01)
+                        vlabels=res['LABELS']
+                        vac=res['AVG_CONF']
+                        flags.VAI_arrived=True
+                        logger.main('cpm',f"RECEIVED SPREAD FROM VAI OF {vlabels} WITH AVERAGES {vac}")
                     except multiprocessing.queues.Empty:
                         continue
-            except queue.Empty:
-                continue
-            try:
-                AUDIO_PACKET = AC2C.get(timeout=0.2)
-                AUDIO_BUFFER_SOURCE = SOURCE(AUDIO_PACKET['SOURCE']).name
-                if AUDIO_PACKET['BUFFER'] is None:
-                    alabels = None
-                    aac = 0
-                    AUDIO_BUFFER_SOURCE = "NONE"
-                else:
-                    for AUDIO in AUDIO_PACKET['BUFFER']:
-                        AUDIOS.append(AUDIO['AUDIO'])
-                    try:
-                        C2A.put(AUDIOS.copy(), block=False)
-                    except multiprocessing.queues.Full:
-                        AUDIOS.clear()
-                        continue
+            if not flags.VAI_arrived:
+                vlabels,vac=None,0
+                logger.main('cpm',"RECEIVED NONE VAI RESULT. BUFFER EMPTY OR SCHEDULE MISSED")
+            scheduler.signals.audio_arrive.wait()
+            flags.audio_arrived=False
+            latest_audio_pkt=None
+            while scheduler.signals.audio_arrive.is_set():
+                try:
+                    latest_audio_pkt=AC2C.get(timeout=0.01)
+                except queue.Empty:
+                    continue
+            if latest_audio_pkt is not None and latest_audio_pkt['BUFFER'] is not None:
+                AUDIO_BUFFER_SOURCE=SOURCE(latest_audio_pkt['SOURCE']).name
+                for a in latest_audio_pkt['BUFFER']:
+                    AUDIOS.append(a['AUDIO'])
+                flags.audio_arrived=True
+                logger.main('cpm',f"RECEIVED BUFFER FROM SOURCE {AUDIO_BUFFER_SOURCE} OF SIZE {len(latest_audio_pkt['BUFFER'])}")
+                logger.main('cpm',f"BUFFER HAS ID {latest_audio_pkt['BATCH']} CONTAINING AUDIO ID(S) {', '.join(str(p['ID']) for p in latest_audio_pkt['BUFFER'])}")
+            else:
+                AUDIO_BUFFER_SOURCE="NONE"
+                logger.main('cpm',"RECEIVED EMPTY BUFFER FROM AUDIO SOURCE")
+            scheduler.signals.aai_return.wait()
+            flags.AAI_arrived=False
+            if AUDIOS:
+                try:
+                    C2A.put(AUDIOS.copy(),block=False)
                     AUDIOS.clear()
+                except multiprocessing.queues.Full:
+                    AUDIOS.clear()
+                while scheduler.signals.aai_return.is_set():
                     try:
-                        A_RESULT = A2C.get(timeout=0.2)
-                        alabels = A_RESULT['LABELS']
-                        aac = A_RESULT['AVG_CONF']
+                        res=A2C.get(timeout=0.01)
+                        alabels=res['LABELS']
+                        aac=res['AVG_CONF']
+                        flags.AAI_arrived=True
+                        logger.main('cpm',f"RECEIVED SPREAD FROM AAI OF {alabels} WITH AVERAGES {aac}")
                     except multiprocessing.queues.Empty:
                         continue
-            except queue.Empty:
-                continue
-            mood, confidence = fusion(vlabels, alabels, vac, aac)
-            packet = {'VSOURCE': VIDEO_BUFFER_SOURCE,'ASOURCE': AUDIO_BUFFER_SOURCE,'MOOD': mood,'CONFIDENCE': confidence}
+            if not flags.AAI_arrived:
+                alabels,aac=None,0
+                logger.main('cpm',"RECEIVED NONE AAI RESULT. BUFFER EMPTY OR SCHEDULE MISSED")
+            if vlabels is None:
+                vac=0
+            if alabels is None:
+                aac=0
+            mood,confidence=fusion(vlabels,alabels,vac,aac)
+            pkt={'VSOURCE':VIDEO_BUFFER_SOURCE,'ASOURCE':AUDIO_BUFFER_SOURCE,'MOOD':mood,'CONFIDENCE':confidence}
             try:
-                C2D.put(packet, block=False)
+                C2D.put(pkt,block=False)
+                logger.main('cpm',f"SENDING PACKET {pkt} TO DISPATCHER")
             except queue.Full:
                 continue
     except KeyboardInterrupt:
         CPM_HALT.set()
-        clean_up()
+    clean_up()
 
 if __name__=="__main__":
     multiprocessing.freeze_support()
