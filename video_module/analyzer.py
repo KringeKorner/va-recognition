@@ -2,6 +2,7 @@
 from debug import logger
 from enum import Enum
 from imutils.video import VideoStream as vs
+from video_module import minerva
 from queue import Queue
 import argparse
 import cv2 as cv
@@ -76,11 +77,16 @@ def main(RECV, SEND, POC, AI_READY):
             if ANALYSIS_STOP.is_set():
                 break
             try:
-                FRAME = RECV.get(timeout=0.5)
+                FRAME = RECV.get(timeout=0.01)
             except queue.Empty:
                 continue
             if FRAME is None:
                 continue
+            faces = []
+            eyes = []
+            smiles = []
+            EYE_RECTS = []
+            SMILE_RECTS = []
             FRAME_GRAY = cv.cvtColor(FRAME["FRAME"], cv.COLOR_BGR2GRAY)
             FACE_RECTS = DETECTORS["face"].detectMultiScale(
                 FRAME_GRAY,
@@ -90,6 +96,7 @@ def main(RECV, SEND, POC, AI_READY):
                 flags=cv.CASCADE_SCALE_IMAGE,
             )
             for fX, fY, fW, fH in FACE_RECTS:
+                faces.append((fX, fY, fW, fH))
                 faceROI = FRAME_GRAY[fY : fY + fH, fX : fX + fW]
                 EYE_RECTS = DETECTORS["eyes"].detectMultiScale(
                     faceROI,
@@ -105,6 +112,10 @@ def main(RECV, SEND, POC, AI_READY):
                     minSize=(15, 15),
                     flags=cv.CASCADE_SCALE_IMAGE,
                 )
+                for eX, eY, eW, eH in EYE_RECTS:
+                    eyes.append((fX + eX, fY + eY, eW, eH))
+                for sX, sY, sW, sH in SMILE_RECTS:
+                    smiles.append((fX + sX, fY + sY, sW, sH))
             if not POC:
                 if len(FACE_RECTS) > 0:
                     if len(EYE_RECTS) > 0 or len(SMILE_RECTS) > 0:
@@ -113,10 +124,71 @@ def main(RECV, SEND, POC, AI_READY):
                         RESPONSE = {"LANDMARK": LANDMARK(2).name, "FRAME": FRAME}
                 else:
                     RESPONSE = {
-                        "LANDMARK": LANDMARK(1).name, "FRAME": {"ID": FRAME["ID"], "FRAME": None},
+                        "LANDMARK": LANDMARK(1).name, "FRAME": {"ID": FRAME["ID"], "FRAME": None}
                     }
             else:
-                print("TBD")
+                if len(FACE_RECTS) > 0:
+                    if len(EYE_RECTS) > 0 or len(SMILE_RECTS) > 0:
+                        RESPONSE = {
+                            "LANDMARK": LANDMARK(3).name,
+                            "FRAME": FRAME,
+                            "DETECTIONS" : {
+                                "faces" : faces,
+                                "eyes" : eyes,
+                                "smiles" : smiles
+                            }
+                        }
+                        MINERVA_RESPONSE = {
+                            "LANDMARK": LANDMARK(3).name,
+                            "FRAME_ID": FRAME["ID"],
+                            "DETECTIONS" : {
+                                "faces" : faces,
+                                "eyes" : eyes,
+                                "smiles" : smiles
+                            }
+                        }
+                    else:
+                        RESPONSE = {
+                            "LANDMARK": LANDMARK(2).name,
+                            "FRAME": FRAME,
+                            "DETECTIONS" : {
+                                "faces" : faces,
+                                "eyes" : [],
+                                "smiles" : []
+                            }
+                        }
+                        MINERVA_RESPONSE = {
+                            "LANDMARK": LANDMARK(2).name,
+                            "FRAME_ID": FRAME["ID"],
+                            "DETECTIONS" : {
+                                "faces" : faces,
+                                "eyes" : [],
+                                "smiles" : []
+                            }
+                        }
+                else:
+                    RESPONSE = {
+                        "LANDMARK": LANDMARK(1).name, 
+                        "FRAME": {
+                            "ID": FRAME["ID"], 
+                            "FRAME": None,
+                        },
+                        "DETECTIONS" : {
+                                "faces" : [],
+                                "eyes" : [],
+                                "smiles" : []
+                        }
+                    }
+                    MINERVA_RESPONSE = {
+                        "LANDMARK": LANDMARK(1).name,
+                        "FRAME_ID": FRAME["ID"],
+                        "DETECTIONS" : {
+                            "faces" : [],
+                            "eyes" : [],
+                            "smiles" : []
+                        }
+                    }
+                minerva.store_analysis(MINERVA_RESPONSE)
             message = f"ANALYZED FRAME {FRAME['ID']} WITH RESULT {RESPONSE['LANDMARK']}"
             logger.main('video_analyzer', message)
             try:

@@ -43,18 +43,18 @@ SCHEDULER_HALT = threading.Event()
 def initialize():
     global SCHEDULER_THREAD
     logger.main('system', 'INITIALIZING SCHEDUELER')
-    # logger.main('dispatcher', 'INITIALIZING SCHEDUELER')
+    logger.main('scheduler', 'INITIALIZING SCHEDUELER')
     SCHEDULER_THREAD = threading.Thread(target=main, args=(), daemon=False, name="scheduler")
     SCHEDULER_THREAD.start()
 
 def clean_up():
     SCHEDULER_HALT.set()
     logger.main('system', 'SHUTTING DOWN SCHEDULER')
-    # logger.main('dispatcher', 'SHUTTING DOWN SCHEDULER')
+    logger.main('scheduler', 'SHUTTING DOWN SCHEDULER')
     if SCHEDULER_THREAD is not None:
         SCHEDULER_THREAD.join(timeout=2.0)
     logger.main('system', 'SCHEDULER TERMINATED')
-    # logger.main('dispatcher', 'SCHEDULER TERMINATED')
+    logger.main('scheduler', 'SCHEDULER TERMINATED')
 
 def wait(wait_time):
     while True:
@@ -77,6 +77,8 @@ def main():
     while not SCHEDULER_HALT.is_set():
         cycle_count += 1
         cycle_start = time.perf_counter()
+        message = f"STARTING CYCLE {cycle_count}"
+        logger.main('scheduler', message)
         # t = 0, start controllers
         signals.vc_start.set()
         signals.ac_start.set()
@@ -103,3 +105,5 @@ def main():
         remaining = (cycle_start + cycle_time) - time.perf_counter()
         if remaining > 0:
             time.sleep(remaining)
+        message = f"CYCLE {cycle_count} ENDED"
+        logger.main('scheduler', message)

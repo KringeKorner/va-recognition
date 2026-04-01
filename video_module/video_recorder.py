@@ -1,6 +1,7 @@
 # imports
 from imutils.video import VideoStream as vs
 from debug import logger
+from video_module import minerva
 import threading
 import time
 import queue
@@ -16,7 +17,7 @@ RECORDER_THREAD = None
 STREAM = None
 
 # helper functions
-def initialize(QUEUE, AI_READY):
+def initialize(QUEUE, AI_READY, MINERVA_CAPTURE):
     global STREAM, RECORDER_THREAD, ID
     logger.main('system', 'INITIALIZING VIDEO RECORDER')
     logger.main('video_recorder', 'INITIALIZING VIDEO RECORDER')
@@ -27,7 +28,7 @@ def initialize(QUEUE, AI_READY):
 
     RECORDER_THREAD = threading.Thread(
         target=main,
-        args=(STREAM, QUEUE, AI_READY),
+        args=(STREAM, QUEUE, AI_READY, MINERVA_CAPTURE),
         daemon=False,
         name="video_recorder_main"
     )
@@ -53,7 +54,7 @@ def clean_up():
     time.sleep(0.5)
 
 # main
-def main(STREAM, QUEUE, AI_READY):
+def main(STREAM, QUEUE, AI_READY, MINERVA_CAPTURE):
     global ID
     if STREAM is None:
         logger.main('system', 'VIDEO RECORDER FAILURE')
@@ -61,14 +62,13 @@ def main(STREAM, QUEUE, AI_READY):
     while not AI_READY.is_set():
         if RECORDING_STOP.is_set():
             return
-        time.sleep(0.05)
+        time.sleep(0.01)
     logger.main('video_recorder', 'READY RECEIVED')
     while True:
         if RECORDING_STOP.is_set():
             logger.main('video_recorder', 'STOP DETECTED, EXITING LOOP')
             break
         FRAME = STREAM.read()
-
         if FRAME is None:
             continue
         try:
@@ -77,7 +77,9 @@ def main(STREAM, QUEUE, AI_READY):
                 "ID": ID,
                 "FRAME": FRAME
             }
+            if MINERVA_CAPTURE.is_set():
+                minerva.store_recorded_frame(FRAME_SENT)
             logger.main('video_recorder', f'CAPTURED FRAME WITH ID {ID}')
             QUEUE.put(FRAME_SENT, block=False)
         except queue.Full:
-            time.sleep(0.01)
+            continue

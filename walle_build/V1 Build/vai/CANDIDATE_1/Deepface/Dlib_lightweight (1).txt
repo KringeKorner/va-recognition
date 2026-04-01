@@ -1,0 +1,181 @@
+import os
+import cv2
+import numpy as np
+from deepface import DeepFace
+from multiprocessing import Process
+from multiprocessing.queues import Empty, Full
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+VAI = None
+
+LABELS = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]
+
+# ------------------ LOW-CPU SETTINGS ------------------
+INFER_SIZE = (640, 360)
+DETECTOR_BACKEND = "opencv"      # keep detector lightweight
+MODEL_NAME = "Dlib"              # recognition model
+DISTANCE_METRIC = "euclidean"    # best metric for Dlib
+RECOGNITION_EVERY = 5            # only run DeepFace.find every N batches
+
+# Set your face database path here
+ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(ROOT_PATH, "database")
+
+FACE_CASCADE = cv2.CascadeClassifier(
+    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+)
+
+def zero_result():
+    return {
+        "LABELS": LABELS,
+        "AVG_CONF": [0.0] * 7,
+        "IDENTITY": "N/A",
+        "ID_CONF": 0.0
+    }
+
+def average(emotion_spread):
+    if not emotion_spread:
+        out = zero_result()
+        return out
+    scores = np.mean([x[1] for x in emotion_spread], axis=0)
+    return {
+        "LABELS": LABELS,
+        "AVG_CONF": np.round(scores, 3).tolist(),
+        "IDENTITY": "N/A",
+        "ID_CONF": 0.0
+    }
+
+def initialize(C2V, V2C, VAI_HALT, VAI_READY):
+    global VAI
+    VAI = Process(target=main, args=(C2V, V2C, VAI_HALT, VAI_READY), daemon=False)
+    VAI.start()
+
+def clean_up(C2V, VAI_HALT):
+    VAI_HALT.set()
+    if VAI is not None:
+        VAI.join(timeout=2.0)
+        if VAI.is_alive():
+            VAI.terminate()
+    while not C2V.empty():
+        try:
+            C2V.get_nowait()
+        except Empty:
+            break
+
+def main(C2V, V2C, VAI_HALT, VAI_READY):
+    batch_counter = 0
+    cached_identity = "N/A"
+    cached_id_conf = 0.0
+
+    # Warmup emotion model
+    try:
+        DeepFace.analyze(
+            img_path=np.zeros((224, 224, 3), dtype=np.uint8),
+            actions=["emotion"],
+            enforce_detection=False,
+            detector_backend=DETECTOR_BACKEND
+        )
+    except Exception:
+        pass
+
+    # Warmup Dlib recognition if DB exists and is non-empty
+    try:
+        if os.path.isdir(DB_PATH) and any(os.scandir(DB_PATH)):
+            dummy = np.zeros((224, 224, 3), dtype=np.uint8)
+            DeepFace.find(
+                img_path=dummy,
+                db_path=DB_PATH,
+                model_name=MODEL_NAME,
+                distance_metric=DISTANCE_METRIC,
+                enforce_detection=False,
+                detector_backend=DETECTOR_BACKEND
+            )
+    except Exception:
+        pass
+
+    VAI_READY.set()
+
+    while not VAI_HALT.is_set():
+        try:
+            frames = C2V.get(timeout=0.2)
+        except Empty:
+            continue
+
+        if not frames or frames[-1] is None:
+            try:
+                V2C.put(zero_result(), timeout=0.2)
+            except Full:
+                pass
+            continue
+
+        # ------------------ LOW CPU: USE ONLY NEWEST FRAME ------------------
+        frame = frames[-1]
+
+        try:
+            frame = cv2.resize(frame, INFER_SIZE)
+        except Exception:
+            pass
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = FACE_CASCADE.detectMultiScale(gray, 1.1, 5)
+
+        # Skip all heavy inference if no face
+        if len(faces) == 0:
+            try:
+                V2C.put(zero_result(), timeout=0.2)
+            except Full:
+                pass
+            continue
+
+        emotion_spread = []
+        output = zero_result()
+
+        try:
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # ------------------ EMOTION (every batch) ------------------
+            result = DeepFace.analyze(
+                img_path=rgb,
+                actions=["emotion"],
+                enforce_detection=False,
+                detector_backend=DETECTOR_BACKEND
+            )
+
+            if isinstance(result, list) and result:
+                face = result[0]
+                emotion = face.get("emotion", {})
+                scores = [float(emotion.get(label, 0.0)) for label in LABELS]
+                emotion_spread.append([LABELS, scores])
+
+            output = average(emotion_spread)
+
+            # ------------------ RECOGNITION (throttled) ------------------
+            batch_counter += 1
+            if batch_counter % RECOGNITION_EVERY == 0:
+                if os.path.isdir(DB_PATH) and any(os.scandir(DB_PATH)):
+                    find_result = DeepFace.find(
+                        img_path=rgb,
+                        db_path=DB_PATH,
+                        model_name=MODEL_NAME,
+                        distance_metric=DISTANCE_METRIC,
+                        enforce_detection=False,
+                        detector_backend=DETECTOR_BACKEND
+                    )
+
+                    if isinstance(find_result, list) and len(find_result) > 0 and not find_result[0].empty:
+                        identity = find_result[0].iloc[0]["identity"]
+                        dist = float(find_result[0].iloc[0]["distance"])
+                        cached_identity = identity.replace("\\", "/").split("/")[-1].split(".")[0]
+                        cached_id_conf = max(0.0, 100.0 - dist * 100.0)
+
+            output["IDENTITY"] = cached_identity
+            output["ID_CONF"] = round(cached_id_conf, 3)
+
+        except Exception:
+            output = zero_result()
+
+        try:
+            V2C.put(output, timeout=0.2)
+        except Full:
+            pass

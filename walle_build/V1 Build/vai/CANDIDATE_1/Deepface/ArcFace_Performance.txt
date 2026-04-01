@@ -1,0 +1,233 @@
+import os
+import cv2
+import numpy as np
+from deepface import DeepFace
+from multiprocessing import Process
+from multiprocessing.queues import Empty, Full
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+VAI = None
+
+LABELS = ["angry", "disgust", "fear", "happy", "sad", "surprise", "neutral"]
+
+# ------------------ ARCFACE SETTINGS ------------------
+MODEL_NAME = "ArcFace"
+DISTANCE_METRIC = "cosine"
+DETECTOR_BACKEND = "opencv"
+
+# Moderate inference size: helps CPU while preserving enough detail for ArcFace
+MAX_INFER_WIDTH = 800
+
+ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(ROOT_PATH, "database")
+
+FACE_CASCADE = cv2.CascadeClassifier(
+    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+)
+
+# ------------------ HELPERS ------------------
+def zero_result():
+    return {
+        "LABELS": LABELS,
+        "AVG_CONF": [0.0] * 7,
+        "IDENTITY": "N/A",
+        "ID_CONF": 0.0
+    }
+
+def average(emotion_spread):
+    if not emotion_spread:
+        return zero_result()
+
+    scores = np.mean([x[1] for x in emotion_spread], axis=0)
+    return {
+        "LABELS": LABELS,
+        "AVG_CONF": np.round(scores, 3).tolist(),
+        "IDENTITY": "N/A",
+        "ID_CONF": 0.0
+    }
+
+def initialize(C2V, V2C, VAI_HALT, VAI_READY):
+    global VAI
+    print("STARTING VAI")
+    VAI = Process(target=main, args=(C2V, V2C, VAI_HALT, VAI_READY), daemon=False)
+    VAI.start()
+
+def clean_up(C2V, VAI_HALT):
+    print("SHUTTING DOWN VAI")
+    VAI_HALT.set()
+
+    if VAI is not None:
+        VAI.join(timeout=2.0)
+        if VAI.is_alive():
+            VAI.terminate()
+
+    while not C2V.empty():
+        try:
+            C2V.get_nowait()
+        except Empty:
+            break
+
+    print("VAI TERMINATED")
+
+def resize_for_inference(frame):
+    h, w = frame.shape[:2]
+    if w <= MAX_INFER_WIDTH:
+        return frame
+    scale = MAX_INFER_WIDTH / float(w)
+    new_size = (int(w * scale), int(h * scale))
+    return cv2.resize(frame, new_size)
+
+def detect_faces(frame_bgr):
+    gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+    return FACE_CASCADE.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+
+def pick_best_frame(frames):
+    """
+    Pick the frame with the largest detected face.
+    This improves ArcFace stability versus using an arbitrary frame.
+    """
+    best_frame = None
+    best_face = None
+    best_area = -1
+
+    for frame in frames:
+        if frame is None:
+            continue
+
+        frame_small = resize_for_inference(frame)
+        faces = detect_faces(frame_small)
+
+        for (x, y, w, h) in faces:
+            area = w * h
+            if area > best_area:
+                best_area = area
+                best_frame = frame_small
+                best_face = (x, y, w, h)
+
+    return best_frame, best_face
+
+def crop_face(frame, face_box, pad=0.15):
+    x, y, w, h = face_box
+    H, W = frame.shape[:2]
+
+    px = int(w * pad)
+    py = int(h * pad)
+
+    x1 = max(0, x - px)
+    y1 = max(0, y - py)
+    x2 = min(W, x + w + px)
+    y2 = min(H, y + h + py)
+
+    roi = frame[y1:y2, x1:x2]
+    return roi if roi.size > 0 else frame
+
+# ------------------ MAIN ------------------
+def main(C2V, V2C, VAI_HALT, VAI_READY):
+    cached_identity = "N/A"
+    cached_id_conf = 0.0
+
+    # Warm up emotion model
+    try:
+        DeepFace.analyze(
+            img_path=np.zeros((224, 224, 3), dtype=np.uint8),
+            actions=["emotion"],
+            enforce_detection=False,
+            detector_backend=DETECTOR_BACKEND
+        )
+    except Exception:
+        pass
+
+    # Warm up ArcFace recognition if DB exists
+    try:
+        if os.path.isdir(DB_PATH) and any(os.scandir(DB_PATH)):
+            dummy = np.zeros((224, 224, 3), dtype=np.uint8)
+            DeepFace.find(
+                img_path=dummy,
+                db_path=DB_PATH,
+                model_name=MODEL_NAME,
+                distance_metric=DISTANCE_METRIC,
+                enforce_detection=False,
+                detector_backend=DETECTOR_BACKEND
+            )
+    except Exception:
+        pass
+
+    VAI_READY.set()
+    print("VAI ONLINE")
+
+    while not VAI_HALT.is_set():
+        try:
+            frames = C2V.get(timeout=0.2)
+        except Empty:
+            continue
+
+        if not frames:
+            try:
+                V2C.put(zero_result(), timeout=0.2)
+            except Full:
+                pass
+            continue
+
+        # ------------------ PICK BEST FRAME IN BATCH ------------------
+        best_frame, best_face = pick_best_frame(frames)
+
+        if best_frame is None or best_face is None:
+            try:
+                V2C.put(zero_result(), timeout=0.2)
+            except Full:
+                pass
+            continue
+
+        # ------------------ CROP LARGEST FACE ROI ------------------
+        roi = crop_face(best_frame, best_face)
+        rgb = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
+
+        output = zero_result()
+
+        try:
+            # ------------------ EMOTION ------------------
+            emotion_result = DeepFace.analyze(
+                img_path=rgb,
+                actions=["emotion"],
+                enforce_detection=False,
+                detector_backend=DETECTOR_BACKEND
+            )
+
+            emotion_spread = []
+
+            if isinstance(emotion_result, list) and len(emotion_result) > 0:
+                face = emotion_result[0]
+                emotions = face.get("emotion", {})
+                scores = [float(emotions.get(label, 0.0)) for label in LABELS]
+                emotion_spread.append([LABELS, scores])
+
+            output = average(emotion_spread)
+
+            # ------------------ RECOGNITION (EVERY VALID BATCH) ------------------
+            if os.path.isdir(DB_PATH) and any(os.scandir(DB_PATH)):
+                find_result = DeepFace.find(
+                    img_path=rgb,
+                    db_path=DB_PATH,
+                    model_name=MODEL_NAME,
+                    distance_metric=DISTANCE_METRIC,
+                    enforce_detection=False,
+                    detector_backend=DETECTOR_BACKEND
+                )
+
+                if isinstance(find_result, list) and len(find_result) > 0 and not find_result[0].empty:
+                    identity = find_result[0].iloc[0]["identity"]
+                    dist = float(find_result[0].iloc[0]["distance"])
+                    cached_identity = identity.replace("\\", "/").split("/")[-1].split(".")[0]
+                    cached_id_conf = max(0.0, 100.0 - dist * 100.0)
+
+            output["IDENTITY"] = cached_identity
+            output["ID_CONF"] = round(cached_id_conf, 3)
+
+        except Exception:
+            output = zero_result()
+
+        try:
+            V2C.put(output, timeout=0.2)
+        except Full:
+            pass
