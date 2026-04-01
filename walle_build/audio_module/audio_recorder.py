@@ -7,8 +7,8 @@ import queue
 
 # vars
 DURATION=2
-DEVICE=None
-fs=16000
+DEVICE=0 # Set this to whatever the device port is
+fs=48000
 ID=0
 RECORDING_STOP=threading.Event()
 RECORDER_THREAD=None

@@ -1,6 +1,6 @@
 # imports
-# TEMP
 from contextlib import redirect_stdout, redirect_stderr
+from debug import logger
 from funasr import AutoModel
 from multiprocessing import Event, Process
 from multiprocessing.queues import Full, Empty
@@ -39,12 +39,14 @@ sample_path = Path(root_path) / 'databases' / 'recording_tests' / 'sample_1.wav'
 # helper functions
 def initialize(C2A, A2C, AAI_HALT, AAI_READY):
     global AAI
-    print("STARTING AAI")
+    logger.main('system', "STARTING AAI")
+    logger.main('aai', "STARTING AAI")
     AAI = Process(target=main, args=(C2A, A2C, AAI_HALT, AAI_READY), daemon=False, name="aai")
     AAI.start()
 
 def clean_up(C2A, AAI_HALT):
-    print("SHUTTING DOWN AAI")
+    logger.main('system', "SHUTTING DOWN AAI")
+    logger.main('aai', "SHUTTING DOWN AAI")
     AAI_HALT.set()
     AAI.join()
     while not C2A.empty():
@@ -52,7 +54,8 @@ def clean_up(C2A, AAI_HALT):
             _ = C2A.get_nowait()
         except Empty:
             break
-    print("AAI TERMINATED")
+    logger.main('system', "AAI TERMINATED")
+    logger.main('aai', "AAI TERMINATED")
 
 def normalize_aai(labels, scores):
     mapped = {}
@@ -72,9 +75,10 @@ def average(emotion_spread):
         'LABELS' : labels,
         'AVG_CONF' : avg_scores
     }
+    message = f"FOR {len(emotion_spread)} SAMPLES PRODUCED AVERAGING RESULT OF {labels} WITH SCORES {avg_scores}"
+    logger.main('aai', message)
     return RESULT
 
-# TEMP, TO BE REMOVED
 def generate_silent(model, audio):
     f = io.StringIO()
     with redirect_stdout(f), redirect_stderr(f):
@@ -87,7 +91,8 @@ def generate_silent(model, audio):
 
 # main
 def main(C2A, A2C, AAI_HALT, AAI_READY):
-    print("INITIATING AAI WARMUP SEQUENCE")
+    logger.main('system', "INITIATING AAI WARMUP SEQUENCE")
+    logger.main('aai', "INITIATING AAI WARMUP SEQUENCE")
     SER = AutoModel(
         model = "emotion2vec_plus_large",
         disable_update = True,
@@ -98,19 +103,24 @@ def main(C2A, A2C, AAI_HALT, AAI_READY):
         extract_embedding=False,
     )
     AAI_READY.set()
-    print("AAI ONLINE\n")
+    logger.main('system', "AAI ONLINE")
+    logger.main('aai', "AAI ONLINE")
     while not AAI_HALT.is_set():
         try:
             AUDIOS = C2A.get(timeout=0.2)
             if not AUDIOS:
                 continue
-            for AUDIO in AUDIOS:
+            message = f"RECEIVED {len(AUDIOS)} FOR AAI ANALYSIS"
+            logger.main('aai', message)
+            for i, AUDIO in enumerate(AUDIOS, start=1):
                 result = generate_silent(SER, AUDIO)
                 labels = [lbl.split('/')[-1] for lbl in result[0]['labels']]
                 labels.pop()
                 scores = [float(score*100) for score in result[0]['scores']]
                 scores.pop()
                 labels, scores = normalize_aai(labels, scores)
+                message = f"FOR AUDIO SAMPLE {i} of {len(AUDIOS)} PRODUCED LOCAL RESULT {labels} WITH SCORES {scores}"
+                logger.main('aai', message)
                 EMOTIONS.append([labels, scores])
             RESULT = average(EMOTIONS)
             EMOTIONS.clear()

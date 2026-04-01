@@ -1,0 +1,5 @@
+# ignore all debug files except for the .py
+**/debug/*
+!**/debug/*.py
+# ignore all MINERVA logs
+**/MINERVA_data/*
